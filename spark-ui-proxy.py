@@ -24,11 +24,14 @@ import os
 import sys
 import urllib2
 import SocketServer
+import mimetypes
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
 BIND_ADDR = os.environ.get("BIND_ADDR", "0.0.0.0")
 SERVER_PORT = int(os.environ.get("SERVER_PORT", "80"))
 URL_PREFIX = os.environ.get("URL_PREFIX", "").rstrip('/') + '/'
+REVERSE_PROXY = os.environ.get("REVERSE_PROXY", "")
+DEBUG = os.environ.get("DEBUG", "")
 SPARK_MASTER_HOST = ""
 
 
@@ -48,13 +51,17 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self.proxyRequest(postData)
 
     def proxyRequest(self, data):
+        if REVERSE_PROXY:
+            self.path = URL_PREFIX.rstrip('/') + self.path
         targetHost, path = self.extractUrlDetails(self.path)
+
         targetUrl = "http://" + targetHost + path
 
-        print("get: " + self.path)
-        print("host: " + targetHost)
-        print("path: " + path)
-        print("target: " + targetUrl)
+        if DEBUG:
+            self.log_message("get: " + self.path)
+            self.log_message("host: " + targetHost)
+            self.log_message("path: " + path)
+            self.log_message("target: " + targetUrl)
 
         proxiedRequest = urllib2.urlopen(targetUrl, data)
         resCode = proxiedRequest.getcode()
@@ -63,6 +70,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
             page = proxiedRequest.read()
             page = self.rewriteLinks(page, targetHost)
             self.send_response(200)
+            mimetype, _ = mimetypes.guess_type(self.path)
+            self.send_header('Content-type', mimetype)
             self.end_headers()
             self.wfile.write(page)
         elif resCode == 302:
@@ -87,6 +96,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         target = "{0}proxy:{1}/".format(URL_PREFIX, targetHost)
         page = page.replace('href="/', 'href="' + target)
         page = page.replace('href="log', 'href="' + target + 'log')
+        page = page.replace('href="app', 'href="' + target + 'app')
         page = page.replace('href="http://', 'href="' + URL_PREFIX + 'proxy:')
         page = page.replace('src="/', 'src="' + target)
         page = page.replace('action="', 'action="' + target)
