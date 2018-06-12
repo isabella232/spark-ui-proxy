@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # MIT License
 # 
 # Copyright (c) 2016 Alexis Seigneurin
@@ -20,10 +21,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import SocketServer
+import logging
 import os
 import sys
 import urllib2
-import SocketServer
 import mimetypes
 from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
 
@@ -37,6 +39,14 @@ SPARK_MASTER_HOST = ""
 
 class ProxyHandler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # Add an health checking endpoint.
+        if self.path in ("/healthz"):
+            self.send_response(code=200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write("OK")
+            return
+
         # redirect if we are hitting the home page
         if self.path in ("", URL_PREFIX):
             self.send_response(302)
@@ -53,8 +63,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def proxyRequest(self, data):
         if REVERSE_PROXY:
             self.path = URL_PREFIX.rstrip('/') + self.path
-        targetHost, path = self.extractUrlDetails(self.path)
 
+        targetHost, path = self.extractUrlDetails(self.path)
         targetUrl = "http://" + targetHost + path
 
         if DEBUG:
@@ -63,7 +73,14 @@ class ProxyHandler(BaseHTTPRequestHandler):
             self.log_message("path: " + path)
             self.log_message("target: " + targetUrl)
 
-        proxiedRequest = urllib2.urlopen(targetUrl, data)
+        print("get: %s  host: %s  path: %s  target: %s" % (self.path, targetHost, path, targetUrl))
+
+        try:
+            proxiedRequest = urllib2.urlopen(targetUrl, data)
+        except Exception as ue:
+            logging.error("Caught an exception trying to reach [ {0} ]".format(targetUrl))
+            raise ue
+
         resCode = proxiedRequest.getcode()
 
         if resCode == 200:
@@ -95,12 +112,15 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def rewriteLinks(self, page, targetHost):
         target = "{0}proxy:{1}/".format(URL_PREFIX, targetHost)
         page = page.replace('href="/', 'href="' + target)
+        page = page.replace("'<div><a href=' + logUrl + '>'",
+                            "'<div><a href=' + location.origin + logUrl.replace('http://', '/proxy:') + '>'")
         page = page.replace('href="log', 'href="' + target + 'log')
         page = page.replace('href="app', 'href="' + target + 'app')
         page = page.replace('href="http://', 'href="' + URL_PREFIX + 'proxy:')
         page = page.replace('src="/', 'src="' + target)
         page = page.replace('action="', 'action="' + target)
         page = page.replace('"/api/v1/', '"' + target + 'api/v1/')
+        page = page.replace('{{uiroot}}/history', '{{uiroot}}' + target + 'history')
         return page
 
 
