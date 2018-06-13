@@ -100,6 +100,12 @@ class ProxyHandler(BaseHTTPRequestHandler):
         page = page.replace('src="/', 'src="' + target)
         page = page.replace('action="', 'action="' + target)
         page = page.replace('"/api/v1/', '"' + target + 'api/v1/')
+        page = page.replace('/static/executorspage-template.html', target + 'static/executorspage-template.html')
+
+        if REVERSE_PROXY:
+            page = page.replace('var ind = words.indexOf("proxy");',
+                                'var ind = words.indexOf("removed-bare-proxy-word-by-spark-ui-proxy");')
+
         return page
 
 
