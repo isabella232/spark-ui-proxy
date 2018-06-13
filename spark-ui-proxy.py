@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # MIT License
 # 
 # Copyright (c) 2016 Alexis Seigneurin
@@ -57,11 +58,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         targetUrl = "http://" + targetHost + path
 
-        if DEBUG:
-            self.log_message("get: " + self.path)
-            self.log_message("host: " + targetHost)
-            self.log_message("path: " + path)
-            self.log_message("target: " + targetUrl)
+        print("get: %s  host: %s  path: %s  target: %s" % (self.path, targetHost, path, targetUrl))
 
         proxiedRequest = urllib2.urlopen(targetUrl, data)
         resCode = proxiedRequest.getcode()
@@ -95,6 +92,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def rewriteLinks(self, page, targetHost):
         target = "{0}proxy:{1}/".format(URL_PREFIX, targetHost)
         page = page.replace('href="/', 'href="' + target)
+        page = page.replace("'<div><a href=' + logUrl + '>'",
+                            "'<div><a href=' + location.origin + logUrl.replace('http://', '/proxy:') + '>'")
         page = page.replace('href="log', 'href="' + target + 'log')
         page = page.replace('href="app', 'href="' + target + 'app')
         page = page.replace('href="http://', 'href="' + URL_PREFIX + 'proxy:')
