@@ -1,5 +1,7 @@
 # Spark UI Proxy
 
+NOTE: This is source{d} fork. It adds support to make it work behind a reverse proxy
+
 If you are running a **Spark Standalone cluster behind a firewall** (let's say it is running on Amazon AWS), you might have issues accessing the UI of your cluster, especially because each worker has its own UI, making it difficult if not impossible to reroute all the ports using only SSH tunnels.
 
 ```
